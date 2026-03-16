@@ -227,9 +227,17 @@ async function fetchAllPrices() {
 function createServer() {
   const server = http.createServer((req, res) => {
     // CORS headers so the frontend can read the data
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-    res.setHeader("Content-Type", "application/json");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "false");
+  res.setHeader("Content-Type", "application/json");
+
+if (req.method === "OPTIONS") {
+  res.writeHead(204);
+  res.end();
+  return;
+}
 
     if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
 
