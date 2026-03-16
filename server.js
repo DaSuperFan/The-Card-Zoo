@@ -76,6 +76,7 @@ function fetchEbaySales(keywords) {
       res.on("end", () => {
         try {
           const json = JSON.parse(data);
+          console.log("eBay raw response:", JSON.stringify(json).slice(0, 500));
           const items = json?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || [];
           const sales = items
             .filter(item => item.sellingStatus?.[0]?.sellingState?.[0] === "EndedWithSales")
