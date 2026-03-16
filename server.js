@@ -15,39 +15,36 @@ const PORT = process.env.PORT || 3001;
 // ── Watchlist — add any player + cards you want to track ─────────────────────
 const WATCHLIST = [
   { player: "Victor Wembanyama", sport: "Basketball", cards: [
-    "Wembanyama 2023 Panini Prizm RC PSA 10",
-    "Wembanyama 2023 Panini Prizm Silver RC PSA 10",
-    "Wembanyama 2023 Topps Chrome RC PSA 10",
+    "Wembanyama Prizm rookie PSA 10",
+    "Wembanyama Topps Chrome rookie PSA 10",
   ]},
   { player: "Caitlin Clark", sport: "Basketball", cards: [
-    "Caitlin Clark 2024 Parkside WNBA RC PSA 10",
-    "Caitlin Clark 2024 Panini Prizm WNBA RC PSA 10",
+    "Caitlin Clark rookie card PSA 10",
+    "Caitlin Clark Prizm PSA 10",
   ]},
   { player: "Shohei Ohtani", sport: "Baseball", cards: [
-    "Shohei Ohtani 2018 Topps Chrome RC PSA 10",
-    "Shohei Ohtani 2018 Topps Update RC PSA 10",
-    "Shohei Ohtani 2018 Topps Update RC PSA 9",
+    "Ohtani 2018 Topps Chrome rookie PSA 10",
+    "Ohtani 2018 Topps Update rookie PSA 10",
   ]},
   { player: "Patrick Mahomes", sport: "Football", cards: [
-    "Mahomes 2017 Panini Prizm RC PSA 10",
-    "Mahomes 2017 Panini Prizm RC PSA 9",
-    "Mahomes 2017 Topps Chrome RC PSA 10",
+    "Mahomes 2017 Prizm rookie PSA 10",
+    "Mahomes 2017 Topps Chrome rookie PSA 10",
   ]},
   { player: "Connor McDavid", sport: "Hockey", cards: [
-    "McDavid 2015 Upper Deck Young Guns RC PSA 10",
-    "McDavid 2015 Upper Deck Young Guns RC PSA 9",
+    "McDavid Young Guns rookie PSA 10",
+    "McDavid Upper Deck rookie PSA 10",
   ]},
   { player: "Jayden Daniels", sport: "Football", cards: [
-    "Jayden Daniels 2024 Panini Prizm RC PSA 10",
-    "Jayden Daniels 2024 Panini Prizm Silver RC PSA 10",
+    "Jayden Daniels Prizm rookie PSA 10",
+    "Jayden Daniels rookie card PSA 10",
   ]},
   { player: "Elly De La Cruz", sport: "Baseball", cards: [
-    "Elly De La Cruz 2023 Bowman Chrome RC PSA 10",
-    "Elly De La Cruz 2023 Topps Chrome RC PSA 10",
+    "Elly De La Cruz Bowman Chrome PSA 10",
+    "Elly De La Cruz rookie PSA 10",
   ]},
   { player: "LeBron James", sport: "Basketball", cards: [
-    "LeBron James 2003 Topps Chrome RC PSA 10",
-    "LeBron James 2003 Topps Chrome RC PSA 9",
+    "LeBron James 2003 Topps Chrome PSA 10",
+    "LeBron James rookie PSA 10",
   ]},
 ];
 
@@ -67,8 +64,9 @@ function fetchEbaySales(keywords) {
       `&RESPONSE-DATA-FORMAT=JSON` +
       `&keywords=${encodedKeywords}` +
       `&itemFilter(0).name=SoldItemsOnly&itemFilter(0).value=true` +
-      `&itemFilter(1).name=ListingType&itemFilter(1).value=AuctionWithBIN` +
-      `&itemFilter(2).name=ListingType(1)&itemFilter(2).value=FixedPrice` +
+      
+      
+      
       `&sortOrder=EndTimeSoonest` +
       `&paginationInput.entriesPerPage=50`;
 
@@ -227,17 +225,9 @@ async function fetchAllPrices() {
 function createServer() {
   const server = http.createServer((req, res) => {
     // CORS headers so the frontend can read the data
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Allow-Credentials", "false");
-  res.setHeader("Content-Type", "application/json");
-
-if (req.method === "OPTIONS") {
-  res.writeHead(204);
-  res.end();
-  return;
-}
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Content-Type", "application/json");
 
     if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
 
