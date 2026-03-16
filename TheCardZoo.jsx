@@ -737,7 +737,7 @@ function SearchTab() {
 }
 
 // ── Live data hook — fetches from backend, falls back to mock ─────────────────
-const BACKEND_URL = "http://localhost:3001"; // ← change to your Railway/Render URL when deployed
+const BACKEND_URL = "https://the-card-zoo-production.up.railway.app"; // ← change to your Railway/Render URL when deployed
 
 function useLiveData() {
   const [liveData, setLiveData] = useState(null);
