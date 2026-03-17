@@ -12,41 +12,91 @@ const EBAY_APP_ID = process.env.EBAY_APP_ID; // Your eBay App ID from developer.
 const DATA_FILE = path.join(__dirname, "price-data.json");
 const PORT = process.env.PORT || 3001;
 
-// ── Watchlist — add any player + cards you want to track ─────────────────────
+// ── Watchlist ─────────────────────────────────────────────────────────────────
 const WATCHLIST = [
-  { player: "Victor Wembanyama", sport: "Basketball", cards: [
-    "Wembanyama Prizm rookie PSA 10",
-    "Wembanyama Topps Chrome rookie PSA 10",
-  ]},
-  { player: "Caitlin Clark", sport: "Basketball", cards: [
-    "Caitlin Clark rookie card PSA 10",
-    "Caitlin Clark Prizm PSA 10",
-  ]},
-  { player: "Shohei Ohtani", sport: "Baseball", cards: [
-    "Ohtani 2018 Topps Chrome rookie PSA 10",
-    "Ohtani 2018 Topps Update rookie PSA 10",
-  ]},
-  { player: "Patrick Mahomes", sport: "Football", cards: [
-    "Mahomes 2017 Prizm rookie PSA 10",
-    "Mahomes 2017 Topps Chrome rookie PSA 10",
-  ]},
-  { player: "Connor McDavid", sport: "Hockey", cards: [
-    "McDavid Young Guns rookie PSA 10",
-    "McDavid Upper Deck rookie PSA 10",
-  ]},
-  { player: "Jayden Daniels", sport: "Football", cards: [
-    "Jayden Daniels Prizm rookie PSA 10",
-    "Jayden Daniels rookie card PSA 10",
-  ]},
-  { player: "Elly De La Cruz", sport: "Baseball", cards: [
-    "Elly De La Cruz Bowman Chrome PSA 10",
-    "Elly De La Cruz rookie PSA 10",
-  ]},
-  { player: "LeBron James", sport: "Basketball", cards: [
-    "LeBron James 2003 Topps Chrome PSA 10",
-    "LeBron James rookie PSA 10",
-  ]},
+
+  // ── NBA TOP 25 ───────────────────────────────────────────────────────────────
+  { player: "Victor Wembanyama", sport: "Basketball", cards: ["Wembanyama Prizm rookie PSA 10", "Wembanyama Topps Chrome rookie PSA 10"] },
+  { player: "LeBron James", sport: "Basketball", cards: ["LeBron James 2003 Topps Chrome PSA 10", "LeBron James rookie PSA 10"] },
+  { player: "Stephen Curry", sport: "Basketball", cards: ["Stephen Curry Prizm rookie PSA 10", "Stephen Curry rookie PSA 10"] },
+  { player: "Luka Doncic", sport: "Basketball", cards: ["Luka Doncic Prizm rookie PSA 10", "Luka Doncic rookie PSA 10"] },
+  { player: "Giannis Antetokounmpo", sport: "Basketball", cards: ["Giannis Prizm rookie PSA 10", "Giannis rookie PSA 10"] },
+  { player: "Nikola Jokic", sport: "Basketball", cards: ["Nikola Jokic Prizm rookie PSA 10", "Nikola Jokic rookie PSA 10"] },
+  { player: "Kevin Durant", sport: "Basketball", cards: ["Kevin Durant Prizm rookie PSA 10", "Kevin Durant rookie PSA 10"] },
+  { player: "Jayson Tatum", sport: "Basketball", cards: ["Jayson Tatum Prizm rookie PSA 10", "Jayson Tatum rookie PSA 10"] },
+  { player: "Anthony Edwards", sport: "Basketball", cards: ["Anthony Edwards Prizm rookie PSA 10", "Anthony Edwards rookie PSA 10"] },
+  { player: "Ja Morant", sport: "Basketball", cards: ["Ja Morant Prizm rookie PSA 10", "Ja Morant rookie PSA 10"] },
+  { player: "Zion Williamson", sport: "Basketball", cards: ["Zion Williamson Prizm rookie PSA 10", "Zion Williamson rookie PSA 10"] },
+  { player: "Paolo Banchero", sport: "Basketball", cards: ["Paolo Banchero Prizm rookie PSA 10", "Paolo Banchero rookie PSA 10"] },
+  { player: "Caitlin Clark", sport: "Basketball", cards: ["Caitlin Clark rookie PSA 10", "Caitlin Clark Prizm PSA 10"] },
+  { player: "Franz Wagner", sport: "Basketball", cards: ["Franz Wagner Prizm rookie PSA 10", "Franz Wagner rookie PSA 10"] },
+  { player: "Tyrese Haliburton", sport: "Basketball", cards: ["Tyrese Haliburton Prizm rookie PSA 10", "Tyrese Haliburton rookie PSA 10"] },
+  { player: "Scottie Barnes", sport: "Basketball", cards: ["Scottie Barnes Prizm rookie PSA 10", "Scottie Barnes rookie PSA 10"] },
+  { player: "Evan Mobley", sport: "Basketball", cards: ["Evan Mobley Prizm rookie PSA 10", "Evan Mobley rookie PSA 10"] },
+  { player: "Cade Cunningham", sport: "Basketball", cards: ["Cade Cunningham Prizm rookie PSA 10", "Cade Cunningham rookie PSA 10"] },
+  { player: "Jalen Green", sport: "Basketball", cards: ["Jalen Green Prizm rookie PSA 10", "Jalen Green rookie PSA 10"] },
+  { player: "Donovan Mitchell", sport: "Basketball", cards: ["Donovan Mitchell Prizm rookie PSA 10", "Donovan Mitchell rookie PSA 10"] },
+  { player: "Devin Booker", sport: "Basketball", cards: ["Devin Booker Prizm rookie PSA 10", "Devin Booker rookie PSA 10"] },
+  { player: "Shai Gilgeous-Alexander", sport: "Basketball", cards: ["Shai Gilgeous Alexander Prizm rookie PSA 10", "SGA rookie PSA 10"] },
+  { player: "Jaylen Brown", sport: "Basketball", cards: ["Jaylen Brown Prizm rookie PSA 10", "Jaylen Brown rookie PSA 10"] },
+  { player: "Bam Adebayo", sport: "Basketball", cards: ["Bam Adebayo Prizm rookie PSA 10", "Bam Adebayo rookie PSA 10"] },
+  { player: "Jaren Jackson Jr", sport: "Basketball", cards: ["Jaren Jackson Prizm rookie PSA 10", "Jaren Jackson rookie PSA 10"] },
+
+  // ── NFL TOP 25 ───────────────────────────────────────────────────────────────
+  { player: "Patrick Mahomes", sport: "Football", cards: ["Mahomes 2017 Prizm rookie PSA 10", "Mahomes 2017 Topps Chrome rookie PSA 10"] },
+  { player: "Josh Allen", sport: "Football", cards: ["Josh Allen Prizm rookie PSA 10", "Josh Allen rookie PSA 10"] },
+  { player: "Lamar Jackson", sport: "Football", cards: ["Lamar Jackson Prizm rookie PSA 10", "Lamar Jackson rookie PSA 10"] },
+  { player: "Joe Burrow", sport: "Football", cards: ["Joe Burrow Prizm rookie PSA 10", "Joe Burrow rookie PSA 10"] },
+  { player: "Justin Jefferson", sport: "Football", cards: ["Justin Jefferson Prizm rookie PSA 10", "Justin Jefferson rookie PSA 10"] },
+  { player: "Justin Herbert", sport: "Football", cards: ["Justin Herbert Prizm rookie PSA 10", "Justin Herbert rookie PSA 10"] },
+  { player: "Jayden Daniels", sport: "Football", cards: ["Jayden Daniels Prizm rookie PSA 10", "Jayden Daniels rookie PSA 10"] },
+  { player: "Caleb Williams", sport: "Football", cards: ["Caleb Williams Prizm rookie PSA 10", "Caleb Williams rookie PSA 10"] },
+  { player: "CJ Stroud", sport: "Football", cards: ["CJ Stroud Prizm rookie PSA 10", "CJ Stroud rookie PSA 10"] },
+  { player: "Marvin Harrison Jr", sport: "Football", cards: ["Marvin Harrison Prizm rookie PSA 10", "Marvin Harrison rookie PSA 10"] },
+  { player: "Brock Purdy", sport: "Football", cards: ["Brock Purdy Prizm rookie PSA 10", "Brock Purdy rookie PSA 10"] },
+  { player: "Ja'Marr Chase", sport: "Football", cards: ["Jamarr Chase Prizm rookie PSA 10", "Jamarr Chase rookie PSA 10"] },
+  { player: "Cooper Kupp", sport: "Football", cards: ["Cooper Kupp Prizm rookie PSA 10", "Cooper Kupp rookie PSA 10"] },
+  { player: "Tyreek Hill", sport: "Football", cards: ["Tyreek Hill Prizm rookie PSA 10", "Tyreek Hill rookie PSA 10"] },
+  { player: "Travis Kelce", sport: "Football", cards: ["Travis Kelce Prizm rookie PSA 10", "Travis Kelce rookie PSA 10"] },
+  { player: "Davante Adams", sport: "Football", cards: ["Davante Adams Prizm rookie PSA 10", "Davante Adams rookie PSA 10"] },
+  { player: "Stefon Diggs", sport: "Football", cards: ["Stefon Diggs Prizm rookie PSA 10", "Stefon Diggs rookie PSA 10"] },
+  { player: "Puka Nacua", sport: "Football", cards: ["Puka Nacua Prizm rookie PSA 10", "Puka Nacua rookie PSA 10"] },
+  { player: "Drake Maye", sport: "Football", cards: ["Drake Maye Prizm rookie PSA 10", "Drake Maye rookie PSA 10"] },
+  { player: "Bo Nix", sport: "Football", cards: ["Bo Nix Prizm rookie PSA 10", "Bo Nix rookie PSA 10"] },
+  { player: "Malik Nabers", sport: "Football", cards: ["Malik Nabers Prizm rookie PSA 10", "Malik Nabers rookie PSA 10"] },
+  { player: "Rome Odunze", sport: "Football", cards: ["Rome Odunze Prizm rookie PSA 10", "Rome Odunze rookie PSA 10"] },
+  { player: "Dak Prescott", sport: "Football", cards: ["Dak Prescott Prizm rookie PSA 10", "Dak Prescott rookie PSA 10"] },
+  { player: "Jalen Hurts", sport: "Football", cards: ["Jalen Hurts Prizm rookie PSA 10", "Jalen Hurts rookie PSA 10"] },
+  { player: "Trevor Lawrence", sport: "Football", cards: ["Trevor Lawrence Prizm rookie PSA 10", "Trevor Lawrence rookie PSA 10"] },
+
+  // ── MLB TOP 25 ───────────────────────────────────────────────────────────────
+  { player: "Shohei Ohtani", sport: "Baseball", cards: ["Ohtani 2018 Topps Chrome rookie PSA 10", "Ohtani Topps Update rookie PSA 10"] },
+  { player: "Mike Trout", sport: "Baseball", cards: ["Mike Trout 2011 Topps Update rookie PSA 10", "Mike Trout rookie PSA 10"] },
+  { player: "Ronald Acuna Jr", sport: "Baseball", cards: ["Ronald Acuna Prizm rookie PSA 10", "Ronald Acuna Topps Chrome rookie PSA 10"] },
+  { player: "Juan Soto", sport: "Baseball", cards: ["Juan Soto Topps Chrome rookie PSA 10", "Juan Soto rookie PSA 10"] },
+  { player: "Elly De La Cruz", sport: "Baseball", cards: ["Elly De La Cruz Bowman Chrome PSA 10", "Elly De La Cruz rookie PSA 10"] },
+  { player: "Paul Skenes", sport: "Baseball", cards: ["Paul Skenes Bowman Chrome PSA 10", "Paul Skenes rookie PSA 10"] },
+  { player: "Jackson Holliday", sport: "Baseball", cards: ["Jackson Holliday Bowman Chrome PSA 10", "Jackson Holliday rookie PSA 10"] },
+  { player: "Gunnar Henderson", sport: "Baseball", cards: ["Gunnar Henderson Bowman Chrome PSA 10", "Gunnar Henderson rookie PSA 10"] },
+  { player: "Julio Rodriguez", sport: "Baseball", cards: ["Julio Rodriguez Topps Chrome rookie PSA 10", "Julio Rodriguez rookie PSA 10"] },
+  { player: "Bobby Witt Jr", sport: "Baseball", cards: ["Bobby Witt Bowman Chrome PSA 10", "Bobby Witt rookie PSA 10"] },
+  { player: "Corbin Carroll", sport: "Baseball", cards: ["Corbin Carroll Bowman Chrome PSA 10", "Corbin Carroll rookie PSA 10"] },
+  { player: "Francisco Lindor", sport: "Baseball", cards: ["Francisco Lindor Topps Chrome rookie PSA 10", "Francisco Lindor rookie PSA 10"] },
+  { player: "Mookie Betts", sport: "Baseball", cards: ["Mookie Betts Topps Chrome rookie PSA 10", "Mookie Betts rookie PSA 10"] },
+  { player: "Freddie Freeman", sport: "Baseball", cards: ["Freddie Freeman Topps Chrome rookie PSA 10", "Freddie Freeman rookie PSA 10"] },
+  { player: "Fernando Tatis Jr", sport: "Baseball", cards: ["Fernando Tatis Topps Chrome rookie PSA 10", "Fernando Tatis rookie PSA 10"] },
+  { player: "Vladimir Guerrero Jr", sport: "Baseball", cards: ["Vladimir Guerrero Topps Chrome rookie PSA 10", "Vladimir Guerrero rookie PSA 10"] },
+  { player: "Adley Rutschman", sport: "Baseball", cards: ["Adley Rutschman Bowman Chrome PSA 10", "Adley Rutschman rookie PSA 10"] },
+  { player: "Yordan Alvarez", sport: "Baseball", cards: ["Yordan Alvarez Topps Chrome rookie PSA 10", "Yordan Alvarez rookie PSA 10"] },
+  { player: "Pete Alonso", sport: "Baseball", cards: ["Pete Alonso Topps Chrome rookie PSA 10", "Pete Alonso rookie PSA 10"] },
+  { player: "Bryce Harper", sport: "Baseball", cards: ["Bryce Harper Topps Chrome rookie PSA 10", "Bryce Harper rookie PSA 10"] },
+  { player: "Cody Bellinger", sport: "Baseball", cards: ["Cody Bellinger Topps Chrome rookie PSA 10", "Cody Bellinger rookie PSA 10"] },
+  { player: "Trea Turner", sport: "Baseball", cards: ["Trea Turner Topps Chrome rookie PSA 10", "Trea Turner rookie PSA 10"] },
+  { player: "Jazz Chisholm Jr", sport: "Baseball", cards: ["Jazz Chisholm Bowman Chrome PSA 10", "Jazz Chisholm rookie PSA 10"] },
+  { player: "Spencer Strider", sport: "Baseball", cards: ["Spencer Strider Topps Chrome rookie PSA 10", "Spencer Strider rookie PSA 10"] },
+  { player: "Yoshinobu Yamamoto", sport: "Baseball", cards: ["Yoshinobu Yamamoto Topps rookie PSA 10", "Yamamoto rookie PSA 10"] },
 ];
+
 
 // ── eBay API call ─────────────────────────────────────────────────────────────
 function fetchEbaySales(keywords) {
@@ -76,7 +126,6 @@ function fetchEbaySales(keywords) {
       res.on("end", () => {
         try {
           const json = JSON.parse(data);
-          console.log("eBay raw response:", JSON.stringify(json).slice(0, 500));
           const items = json?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || [];
           const sales = items
             .filter(item => item.sellingStatus?.[0]?.sellingState?.[0] === "EndedWithSales")
