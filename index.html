@@ -386,9 +386,10 @@ function PlayerDetailPage({ player, onBack }) {
 }
 
 // ── Hot Market Tab ────────────────────────────────────────────────────────────
-function HotMarketTab({ sportFilter, onPlayerClick, hotPlayers = HOT_PLAYERS, liveStatus = "mock" }) {
+function HotMarketTab({ sportFilter, onPlayerClick, hotPlayers = HOT_PLAYERS, liveStatus = "mock", backendUrl }) {
   const [view, setView] = useState("players");
   const [sortBy, setSortBy] = useState("heat");
+  const [showRequestModal, setShowRequestModal] = useState(false);
 
   const filteredPlayers = useMemo(() =>
     hotPlayers
@@ -413,15 +414,24 @@ function HotMarketTab({ sportFilter, onPlayerClick, hotPlayers = HOT_PLAYERS, li
           </div>
           <p style={{ fontSize:12, color:"#555", marginTop:4 }}>Click any player name to see their full card breakdown & trends</p>
         </div>
-        <div style={{ display:"flex", background:"#0f1117", border:"1px solid #1e2130", borderRadius:8, overflow:"hidden" }}>
+        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+          <button onClick={() => setShowRequestModal(true)}
+            style={{ padding:"8px 16px", background:"none", border:"1px solid #f97316", borderRadius:8, cursor:"pointer", fontFamily:"inherit", fontSize:12, color:"#f97316", display:"flex", alignItems:"center", gap:6 }}>
+            ➕ Request Player
+          </button>
+          <div style={{ display:"flex", background:"#0f1117", border:"1px solid #1e2130", borderRadius:8, overflow:"hidden" }}>
           {[["players","👤 Players"],["cards","🃏 Cards"]].map(([v,l])=>(
             <button key={v} onClick={()=>setView(v)}
               style={{ padding:"8px 18px", background:view===v?"#f97316":"transparent", border:"none", cursor:"pointer", fontFamily:"inherit", fontSize:12, color:view===v?"#fff":"#555" }}>
               {l}
             </button>
           ))}
+          </div>
         </div>
       </div>
+
+      {/* Request Player Modal */}
+      {showRequestModal && <RequestPlayerModal onClose={() => setShowRequestModal(false)} backendUrl={backendUrl} />}
 
       {/* Callout */}
       {view==="players" && topPlayer && (
@@ -648,6 +658,105 @@ function TrendsPopTab({ sportFilter }) {
 }
 
 // ── Search Tab ────────────────────────────────────────────────────────────────
+// ── Request Player Modal ──────────────────────────────────────────────────────
+function RequestPlayerModal({ onClose, backendUrl }) {
+  const [playerName, setPlayerName] = useState("");
+  const [sport, setSport] = useState("Basketball");
+  const [status, setStatus] = useState(null); // null | "loading" | "success" | "error"
+  const [message, setMessage] = useState("");
+
+  const submit = () => {
+    if (!playerName.trim()) return;
+    setStatus("loading");
+    fetch(`${backendUrl}/api/request`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ player: playerName.trim(), sport }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        setStatus(data.status === "approved" || data.status === "already_tracked" || data.status === "upvoted" || data.status === "requested" ? "success" : "error");
+        setMessage(data.message || "Player requested!");
+      })
+      .catch(() => { setStatus("error"); setMessage("Could not connect to server. Try again later."); });
+  };
+
+  const SPORTS = ["Basketball", "Football", "Baseball", "Hockey"];
+  const SPORT_COLORS = { Basketball: "#f97316", Football: "#22c55e", Baseball: "#3b82f6", Hockey: "#a855f7" };
+
+  return (
+    <div style={{ position:"fixed", top:0, left:0, right:0, bottom:0, background:"rgba(0,0,0,0.7)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:"#0f1117", border:"1px solid #2a2d3a", borderRadius:16, padding:32, width:"100%", maxWidth:440, margin:"0 16px" }}>
+
+        {/* Header */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
+          <div>
+            <p style={{ fontFamily:"serif", fontWeight:900, fontSize:20, letterSpacing:2 }}>REQUEST A PLAYER</p>
+            <p style={{ fontSize:12, color:"#555", marginTop:4 }}>Can't find someone? Add them to tracking</p>
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:"none", color:"#555", cursor:"pointer", fontSize:20 }}>✕</button>
+        </div>
+
+        {status === "success" ? (
+          <div style={{ textAlign:"center", padding:"20px 0" }}>
+            <p style={{ fontSize:32 }}>✅</p>
+            <p style={{ fontSize:14, color:"#22c55e", marginTop:12, fontFamily:"serif", fontWeight:900 }}>REQUEST RECEIVED</p>
+            <p style={{ fontSize:12, color:"#8b8fa8", marginTop:8 }}>{message}</p>
+            <button onClick={onClose}
+              style={{ marginTop:20, background:"#f97316", border:"none", borderRadius:8, padding:"10px 24px", color:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:13 }}>
+              Done
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Player name input */}
+            <div style={{ marginBottom:16 }}>
+              <p style={{ fontSize:11, color:"#555", letterSpacing:1, marginBottom:8 }}>PLAYER NAME</p>
+              <input
+                style={{ width:"100%", background:"#080a0f", border:`1px solid ${playerName ? "#f97316" : "#2a2d3a"}`, borderRadius:8, padding:"12px 16px", fontFamily:"inherit", fontSize:14, color:"#e2e4ef", outline:"none" }}
+                placeholder="e.g. Bo Jackson, Barry Sanders..."
+                value={playerName}
+                onChange={e => setPlayerName(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && submit()}
+                autoFocus
+              />
+            </div>
+
+            {/* Sport selector */}
+            <div style={{ marginBottom:24 }}>
+              <p style={{ fontSize:11, color:"#555", letterSpacing:1, marginBottom:8 }}>SPORT</p>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                {SPORTS.map(s => (
+                  <button key={s} onClick={() => setSport(s)}
+                    style={{ padding:"6px 16px", borderRadius:20, border:`1px solid ${sport===s?(SPORT_COLORS[s]||"#f97316"):"#2a2d3a"}`, background:sport===s?`${SPORT_COLORS[s]||"#f97316"}18`:"none", color:sport===s?(SPORT_COLORS[s]||"#f97316"):"#555", cursor:"pointer", fontFamily:"inherit", fontSize:12 }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Error message */}
+            {status === "error" && (
+              <p style={{ fontSize:12, color:"#ef4444", marginBottom:16 }}>{message}</p>
+            )}
+
+            {/* Submit */}
+            <button onClick={submit} disabled={!playerName.trim() || status === "loading"}
+              style={{ width:"100%", background: playerName.trim() ? "#f97316" : "#1e2130", border:"none", borderRadius:8, padding:"12px", color: playerName.trim() ? "#fff" : "#444", cursor: playerName.trim() ? "pointer" : "default", fontFamily:"inherit", fontSize:14, fontWeight:500, letterSpacing:1 }}>
+              {status === "loading" ? "Submitting..." : "REQUEST PLAYER"}
+            </button>
+
+            <p style={{ fontSize:11, color:"#333", marginTop:12, textAlign:"center" }}>
+              Players are added automatically and tracked from the next daily refresh
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SearchTab() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(null);
@@ -821,94 +930,4 @@ function TheCardZoo() {
 
   const tabBtn = (id, label) => (
     <button key={id} onClick={()=>setActiveTab(id)}
-      style={{ background:"none", border:"none", borderBottom:activeTab===id?"2px solid #f97316":"2px solid transparent", cursor:"pointer", padding:"10px 20px", fontFamily:"inherit", fontSize:13, letterSpacing:"0.08em", color:activeTab===id?"#f97316":"#555", whiteSpace:"nowrap" }}>
-      {label}
-    </button>
-  );
-
-  return (
-    <div style={S.body}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg);}} *{box-sizing:border-box;margin:0;padding:0;}`}</style>
-
-      {/* Header */}
-      <div style={S.header}>
-        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-          {selectedPlayer && (
-            <button onClick={handleBack} style={{ background:"none", border:"1px solid #2a2d3a", borderRadius:6, padding:"4px 10px", color:"#555", cursor:"pointer", fontFamily:"inherit", fontSize:12 }}>←</button>
-          )}
-          <span style={S.logo}>{selectedPlayer ? `THE CARD ZOO / ${selectedPlayer.player.split(" ").at(-1).toUpperCase()}` : "THE CARD ZOO"}</span>
-          {!selectedPlayer && (
-            <span style={{ fontSize:10, padding:"3px 10px", borderRadius:20, letterSpacing:1,
-              background:liveStatus==="live"?"#1a2a1a":liveStatus==="mock"?"#1a1a2a":"#1a1a1a",
-              color:liveStatus==="live"?"#22c55e":liveStatus==="mock"?"#555":"#444",
-              border:`1px solid ${liveStatus==="live"?"#22c55e30":"#2a2d3a"}` }}>
-              {liveStatus==="live"
-                ? `● LIVE · ${new Date(lastUpdated).toLocaleDateString()}`
-                : liveStatus==="mock" ? "◌ MOCK DATA — add eBay key to go live" : "◌ CONNECTING..."}
-            </span>
-          )}
-        </div>
-        {!selectedPlayer && (
-          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-            {SPORTS.map(s=>(
-              <button key={s} onClick={()=>setSportFilter(s)}
-                style={{ display:"inline-flex", alignItems:"center", padding:"5px 12px", borderRadius:20, border:`1px solid ${sportFilter===s?(SPORT_COLORS[s]||"#f97316"):"#2a2d3a"}`, fontSize:12, cursor:"pointer", fontFamily:"inherit", background:sportFilter===s?`${SPORT_COLORS[s]||"#f97316"}18`:"none", color:sportFilter===s?(SPORT_COLORS[s]||"#f97316"):"#555" }}>
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Tabs — hide when on player detail */}
-      {!selectedPlayer && (
-        <div style={S.tabBar}>
-          {[["hot","🔥 Hot Market"],["search","🔍 Search"],["analysis","📊 Trends & Pop"],["import","⬆ Import"]].map(([id,label])=>tabBtn(id,label))}
-        </div>
-      )}
-
-      {/* Page content */}
-      {selectedPlayer ? (
-        <PlayerDetailPage player={selectedPlayer} onBack={handleBack}/>
-      ) : (
-        <div style={S.content}>
-          {activeTab==="hot"      && <HotMarketTab sportFilter={sportFilter} onPlayerClick={handlePlayerClick} hotPlayers={hotPlayers} liveStatus={liveStatus}/>}
-          {activeTab==="search"   && <SearchTab/>}
-          {activeTab==="analysis" && <TrendsPopTab sportFilter={sportFilter}/>}
-          {activeTab==="import"   && (
-            <div style={{ maxWidth:600 }}>
-              <h2 style={{ fontFamily:"serif", fontWeight:900, fontSize:22, letterSpacing:2, marginBottom:6 }}>IMPORT YOUR DATA</h2>
-              <p style={{ fontSize:12, color:"#555", marginBottom:28 }}>Connect real data sources to replace sample data</p>
-              <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-                <div style={S.statBox}>
-                  <p style={{ fontSize:13, color:"#e2e4ef", marginBottom:4 }}>📁 CSV Upload</p>
-                  <p style={{ fontSize:12, color:"#555", marginBottom:14 }}>Upload a spreadsheet exported from eBay, PWCC, or your tracking sheet.</p>
-                  <label style={{ border:"2px dashed #2a2d3a", borderRadius:10, padding:30, textAlign:"center", cursor:"pointer", display:"block" }}>
-                    <input type="file" accept=".csv" style={{ display:"none" }} onChange={e=>{const f=e.target.files[0];if(f)setUploadMsg(`✓ "${f.name}" ready`);}}/>
-                    <p style={{ color:"#555", fontSize:13 }}>Drop CSV here or click to browse</p>
-                    <p style={{ color:"#333", fontSize:11, marginTop:4 }}>Expected: player, sport, year, set, grade, sale_price, sale_date</p>
-                  </label>
-                  {uploadMsg&&<p style={{ fontSize:12, color:"#22c55e", marginTop:10 }}>{uploadMsg}</p>}
-                </div>
-                {[{icon:"🔗",name:"eBay Sold Listings API",desc:"Pull real sold comps via eBay's Finding API.",status:"Add API Key",c:"#f97316"},{icon:"📊",name:"PSA Population Report",desc:"Sync PSA registry data for any card set.",status:"Available",c:"#22c55e"},{icon:"💹",name:"130point / Mavin",desc:"Connect to third-party pricing aggregators.",status:"Coming soon",c:"#444"}].map(({icon,name,desc,status,c})=>(
-                  <div key={name} style={{ ...S.statBox, display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
-                    <div><p style={{ fontSize:13, color:"#e2e4ef" }}>{icon} {name}</p><p style={{ fontSize:12, color:"#555", marginTop:3 }}>{desc}</p></div>
-                    <span style={{ fontSize:11, padding:"4px 10px", borderRadius:20, border:`1px solid ${c}40`, color:c, whiteSpace:"nowrap" }}>{status}</span>
-                  </div>
-                ))}
-                <div style={{ background:"#080a0f", borderRadius:10, padding:"14px 18px", border:"1px solid #1e2130" }}>
-                  <p style={{ fontSize:11, color:"#555", letterSpacing:1, marginBottom:8 }}>CSV FORMAT</p>
-                  <pre style={{ fontFamily:"monospace", fontSize:11, color:"#8b8fa8", lineHeight:1.7 }}>{`player,sport,year,set,grade,sale_price,sale_date\nLeBron James,Basketball,2003,Topps Chrome RC,PSA 10,8400,2025-01-15`}</pre>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-ReactDOM.createRoot(document.getElementById("root")).render(<TheCardZoo />);
-</script>
-</body>
-</html>
+      style={{ background:"none", border:"none", borderBottom:activeTab===id?"2px solid #f97316":"2px solid transparent", cursor:"pointer", paddin
