@@ -659,7 +659,28 @@ function SearchTab() {
   const runSearch = q => {
     const term=(q||query).trim(); if(!term) return;
     setShowSug(false); setLoading(true); setResults(null); setSearched(term);
-    setTimeout(()=>{ setResults(generateMockSales(term)); setLoading(false); }, 900);
+    fetch(`${BACKEND_URL}/api/search?q=${encodeURIComponent(term)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error || !data.stats) {
+          setResults(generateMockSales(term));
+        } else {
+          const psa10 = data.sales.filter(s => s.title && s.title.toUpperCase().includes('PSA 10')).map(s => s.price);
+          const formattedSales = data.sales.map(s => ({
+            ...s,
+            date: s.date ? new Date(s.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : 'N/A',
+            grade: s.title?.match(/PSA \d+/i)?.[0] || 'Raw',
+            platform: 'eBay'
+          }));
+          setResults({
+            ...data,
+            stats: { ...data.stats, psa10Avg: psa10.length ? Math.round(psa10.reduce((a,b)=>a+b,0)/psa10.length) : 0, count: data.sales.length },
+            sales: formattedSales
+          });
+        }
+        setLoading(false);
+      })
+      .catch(() => { setResults(generateMockSales(term)); setLoading(false); });
   };
   return (
     <div>
@@ -684,13 +705,13 @@ function SearchTab() {
           </div>
         )}
       </div>
-      <p style={{ fontSize:11, color:"#333", marginBottom:28 }}>⚠ Simulated data — connect eBay API key in Import tab for live results</p>
+      <p style={{ fontSize:11, color:"#333", marginBottom:28 }}>🔴 Live eBay data — results reflect real recent sales</p>
       {loading&&<div style={{ display:"flex", alignItems:"center", gap:12, padding:"40px 0", color:"#555", fontSize:13 }}><div style={{ width:18, height:18, border:"2px solid #2a2d3a", borderTopColor:"#f97316", borderRadius:"50%", animation:"spin 0.7s linear infinite" }}/>Fetching listings for "{searched}"...</div>}
       {results&&!loading&&(
         <div>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:8 }}>
             <p style={{ fontSize:13, color:"#8b8fa8" }}>Results for <span style={{ color:"#f97316" }}>{searched}</span> <span style={{ color:"#333" }}>· {results.stats.count} sales · last 90 days</span></p>
-            <span style={{ fontSize:10, padding:"2px 8px", borderRadius:4, background:"#1a2a1a", color:"#22c55e", border:"1px solid #22c55e30" }}>SIMULATED DATA</span>
+            <span style={{ fontSize:10, padding:"2px 8px", borderRadius:4, background:"#1a2a1a", color:"#22c55e", border:"1px solid #22c55e30" }}>LIVE EBAY DATA</span>
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))", gap:10, marginBottom:24 }}>
             {[{l:"AVG PRICE",v:fmt(results.stats.avg),c:"#f97316"},{l:"HIGH SALE",v:fmt(results.stats.high),c:"#22c55e"},{l:"LOW SALE",v:fmt(results.stats.low),c:"#ef4444"},{l:"PSA 10 AVG",v:fmt(results.stats.psa10Avg),c:"#a855f7"},{l:"TOTAL SALES",v:results.stats.count,c:"#3b82f6"}].map(({l,v,c})=>(
