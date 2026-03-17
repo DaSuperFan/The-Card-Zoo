@@ -10,6 +10,31 @@ const path = require("path");
 
 const EBAY_APP_ID = process.env.EBAY_APP_ID; // Your eBay App ID from developer.ebay.com
 const DATA_FILE = path.join(__dirname, "price-data.json");
+
+// ── Search cache — stores results in memory for 6 hours ───────────────────────
+// This means identical searches reuse the same eBay API call instead of
+// making a new one, multiplying effective capacity by 10-20x
+const SEARCH_CACHE = new Map();
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+function getCached(key) {
+  const entry = SEARCH_CACHE.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    SEARCH_CACHE.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCache(key, data) {
+  // Keep cache from growing too large — max 500 entries
+  if (SEARCH_CACHE.size >= 500) {
+    const oldestKey = SEARCH_CACHE.keys().next().value;
+    SEARCH_CACHE.delete(oldestKey);
+  }
+  SEARCH_CACHE.set(key, { data, timestamp: Date.now() });
+}
 const PORT = process.env.PORT || 3001;
 
 // ── Watchlist ─────────────────────────────────────────────────────────────────
@@ -303,6 +328,20 @@ function createServer() {
         res.end(JSON.stringify({ error: "Missing ?q= parameter" }));
         return;
       }
+      // Normalize query for cache key (lowercase, trimmed)
+      const cacheKey = query.toLowerCase().trim();
+      const cached = getCached(cacheKey);
+
+      if (cached) {
+        // Cache hit — return instantly, no eBay API call used
+        console.log(`  [CACHE HIT] "${query}" — serving cached result`);
+        res.writeHead(200);
+        res.end(JSON.stringify({ ...cached, fromCache: true }));
+        return;
+      }
+
+      // Cache miss — fetch from eBay and cache the result
+      console.log(`  [CACHE MISS] "${query}" — fetching from eBay`);
       fetchEbaySales(query)
         .then(sales => {
           const stats = calcStats(sales);
@@ -321,8 +360,10 @@ function createServer() {
             });
             return { week: `W${12 - i}`, avg: wkSales.length ? Math.round(wkSales.reduce((a, b) => a + b.price, 0) / wkSales.length) : null };
           }).reverse();
+          const result = { query, stats, sales: sales.slice(0, 30), trend, distribution, fromCache: false };
+          setCache(cacheKey, result);
           res.writeHead(200);
-          res.end(JSON.stringify({ query, stats, sales: sales.slice(0, 30), trend, distribution }));
+          res.end(JSON.stringify(result));
         })
         .catch(e => { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); });
       return;
@@ -346,6 +387,11 @@ function createServer() {
         lastUpdated: data?.lastUpdated || null,
         playerCount: data?.players?.length || 0,
         ebayConnected: !!EBAY_APP_ID,
+        cache: {
+          entries: SEARCH_CACHE.size,
+          maxEntries: 500,
+          ttlHours: 6,
+        }
       }));
       return;
     }
@@ -358,7 +404,8 @@ function createServer() {
     console.log(`\n🚀 CardPulse server running on http://localhost:${PORT}`);
     console.log(`   GET  /api/prices  — latest price data`);
     console.log(`   GET  /api/status  — server status`);
-    console.log(`   POST /api/fetch   — trigger manual fetch\n`);
+    console.log(`   POST /api/fetch   — trigger manual fetch`);
+    console.log(`   GET  /api/search?q= — live card search (cached 6hrs)\n`);
     if (!EBAY_APP_ID) {
       console.warn("⚠️  EBAY_APP_ID not set in .env — add it to enable live data\n");
     }
