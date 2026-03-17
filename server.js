@@ -293,6 +293,41 @@ function createServer() {
       return;
     }
 
+
+    // ── Live search endpoint ── /api/search?q=LeBron+James+PSA+10 ────────────
+    if (req.url.startsWith("/api/search")) {
+      const urlObj = new URL(req.url, "http://localhost");
+      const query = urlObj.searchParams.get("q");
+      if (!query) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: "Missing ?q= parameter" }));
+        return;
+      }
+      fetchEbaySales(query)
+        .then(sales => {
+          const stats = calcStats(sales);
+          const allPrices = sales.map(s => s.price).filter(p => p > 0);
+          const minP = allPrices.length ? Math.min(...allPrices) : 0;
+          const maxP = allPrices.length ? Math.max(...allPrices) : 0;
+          const bSize = Math.max(1, Math.ceil((maxP - minP) / 6));
+          const distribution = Array.from({ length: 6 }, (_, i) => {
+            const lo = minP + i * bSize, hi = lo + bSize;
+            return { range: `$${lo}-$${hi}`, count: allPrices.filter(p => p >= lo && p < hi).length };
+          });
+          const trend = Array.from({ length: 12 }, (_, i) => {
+            const wkSales = sales.filter(s => {
+              const daysAgo = Math.floor((Date.now() - new Date(s.date).getTime()) / 86400000);
+              return daysAgo >= i * 7 && daysAgo < (i + 1) * 7;
+            });
+            return { week: `W${12 - i}`, avg: wkSales.length ? Math.round(wkSales.reduce((a, b) => a + b.price, 0) / wkSales.length) : null };
+          }).reverse();
+          res.writeHead(200);
+          res.end(JSON.stringify({ query, stats, sales: sales.slice(0, 30), trend, distribution }));
+        })
+        .catch(e => { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); });
+      return;
+    }
+
     if (req.url === "/api/fetch" && req.method === "POST") {
       // Trigger a manual fetch
       fetchAllPrices()
