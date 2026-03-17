@@ -10,6 +10,7 @@ const path = require("path");
 
 const EBAY_APP_ID = process.env.EBAY_APP_ID; // Your eBay App ID from developer.ebay.com
 const DATA_FILE = path.join(__dirname, "price-data.json");
+const REQUESTS_FILE = path.join(__dirname, "player-requests.json");
 
 // ── Search cache — stores results in memory for 6 hours ───────────────────────
 // This means identical searches reuse the same eBay API call instead of
@@ -36,6 +37,31 @@ function setCache(key, data) {
   SEARCH_CACHE.set(key, { data, timestamp: Date.now() });
 }
 const PORT = process.env.PORT || 3001;
+
+// ── Player request helpers ───────────────────────────────────────────────────
+function loadRequests() {
+  if (!fs.existsSync(REQUESTS_FILE)) return [];
+  try { return JSON.parse(fs.readFileSync(REQUESTS_FILE, "utf8")); }
+  catch (e) { return []; }
+}
+
+function saveRequests(requests) {
+  fs.writeFileSync(REQUESTS_FILE, JSON.stringify(requests, null, 2));
+}
+
+// Auto-generate eBay search terms from a player name + sport
+function generateCardSearches(playerName, sport) {
+  const name = playerName.trim();
+  const lastName = name.split(" ").slice(-1)[0];
+  const sportKeywords = {
+    Basketball: ["Prizm rookie PSA 10", "Topps Chrome rookie PSA 10"],
+    Football:   ["Prizm rookie PSA 10", "Topps Chrome rookie PSA 10"],
+    Baseball:   ["Bowman Chrome PSA 10", "Topps Chrome rookie PSA 10"],
+    Hockey:     ["Young Guns rookie PSA 10", "Upper Deck rookie PSA 10"],
+  };
+  const keywords = sportKeywords[sport] || sportKeywords["Basketball"];
+  return keywords.map(k => `${lastName} ${k}`);
+}
 
 // ── Watchlist ─────────────────────────────────────────────────────────────────
 const WATCHLIST = [
@@ -396,39 +422,5 @@ function createServer() {
       return;
     }
 
-    res.writeHead(404);
-    res.end(JSON.stringify({ error: "Not found" }));
-  });
-
-  server.listen(PORT, () => {
-    console.log(`\n🚀 CardPulse server running on http://localhost:${PORT}`);
-    console.log(`   GET  /api/prices  — latest price data`);
-    console.log(`   GET  /api/status  — server status`);
-    console.log(`   POST /api/fetch   — trigger manual fetch`);
-    console.log(`   GET  /api/search?q= — live card search (cached 6hrs)\n`);
-    if (!EBAY_APP_ID) {
-      console.warn("⚠️  EBAY_APP_ID not set in .env — add it to enable live data\n");
-    }
-  });
-}
-
-// ── Scheduler — fetch once on startup, then every 24 hours ───────────────────
-async function start() {
-  createServer();
-
-  // Initial fetch on startup
-  if (EBAY_APP_ID) {
-    await fetchAllPrices().catch(e => console.error("Initial fetch failed:", e.message));
-  } else {
-    console.log("Skipping fetch — no EBAY_APP_ID configured");
-  }
-
-  // Schedule daily refresh
-  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-  setInterval(async () => {
-    console.log("Running scheduled daily fetch...");
-    await fetchAllPrices().catch(e => console.error("Scheduled fetch failed:", e.message));
-  }, TWENTY_FOUR_HOURS);
-}
-
-start();
+    // ── POST /api/request — user submits a player to track ──────────────────
+    if (req.url === "/api/request" && req.method === "POST") {
