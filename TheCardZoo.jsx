@@ -627,7 +627,7 @@ function TrendsPopTab({ sportFilter }) {
 }
 //  Grade Comparison //
 
-function PSAComparison({ sportFilter }) {
+function PSAComp({ sportFilter }) {
   const [selectedCards, setSelectedCards] = useState(["LeBron James","Patrick Mahomes"]);
   const filteredCards = useMemo(() => SAMPLE_CARDS.filter(c=>sportFilter==="All"||c.sport===sportFilter), [sportFilter]);
   const toggleCard = p => setSelectedCards(prev=>prev.includes(p)?prev.filter(x=>x!==p):prev.length<4?[...prev,p]:prev);
@@ -924,6 +924,7 @@ export default function TheCardZoo() {
         <div style={S.content}>
           {activeTab==="hot"      && <HotMarketTab sportFilter={sportFilter} onPlayerClick={handlePlayerClick} hotPlayers={hotPlayers} liveStatus={liveStatus}/>}
           {activeTab==="search"   && <SearchTab/>}
+          {activeTab==="PSAComp"  && ()
           {activeTab==="analysis" && <TrendsPopTab sportFilter={sportFilter}/>}
           {activeTab==="import"   && (
             <div style={{ maxWidth:600 }}>
