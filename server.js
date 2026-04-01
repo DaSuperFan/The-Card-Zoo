@@ -578,17 +578,19 @@ function createServer() {
 async function start() {
   createServer();
 
-  if (!EBAY_APP_ID) {
+  // Initial fetch on startup
+  if (EBAY_APP_ID) {
+    await fetchAllPrices().catch(e => console.error("Initial fetch failed:", e.message));
+  } else {
     console.log("Skipping fetch — no EBAY_APP_ID configured");
-    return;
   }
 
-  // Only fetch on startup if we haven't already fetched today
-  // This prevents burning through the rate limit on every Railway restart
-  const today = new Date().toISOString().split("T")[0];
-  let alreadyFetchedToday = false;
+  // Schedule daily refresh
+  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+  setInterval(async () => {
+    console.log("Running scheduled daily fetch...");
+    await fetchAllPrices().catch(e => console.error("Scheduled fetch failed:", e.message));
+  }, TWENTY_FOUR_HOURS);
+}
 
-  if (fs.existsSync(DATA_FILE)) {
-    try {
-      const existing = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
-      const lastFetchDate = existing?.lastUpdated?.split("T"
+start();
