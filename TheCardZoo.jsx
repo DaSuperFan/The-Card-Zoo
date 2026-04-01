@@ -625,7 +625,99 @@ function TrendsPopTab({ sportFilter }) {
     </div>
   );
 }
+//  Grade Comparison //
 
+function PSAComparison({ sportFilter }) {
+  const [selectedCards, setSelectedCards] = useState(["LeBron James","Patrick Mahomes"]);
+  const filteredCards = useMemo(() => SAMPLE_CARDS.filter(c=>sportFilter==="All"||c.sport===sportFilter), [sportFilter]);
+  const toggleCard = p => setSelectedCards(prev=>prev.includes(p)?prev.filter(x=>x!==p):prev.length<4?[...prev,p]:prev);
+  const trendData = useMemo(() =>
+    MONTHS.map((m,i)=>{ const row={month:m}; selectedCards.forEach(p=>{row[p]=PRICE_HISTORY[p]?.[i]?.price??null;}); return row; }),
+    [selectedCards]
+  );
+  const popData = useMemo(() => filteredCards.map(c=>({name:c.player,pop:c.pop,avgSale:c.avgSale,sport:c.sport})), [filteredCards]);
+
+  return (
+    <div>
+      {/* Price Trends section */}
+      <div style={{ marginBottom:32 }}>
+        <h2 style={{ fontFamily:"serif", fontWeight:900, fontSize:20, letterSpacing:2, marginBottom:4 }}>PRICE TRENDS — 12 MONTHS</h2>
+        <p style={{ fontSize:12, color:"#555", marginBottom:16 }}>Select up to 4 cards to compare</p>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:16 }}>
+          {Object.keys(PRICE_HISTORY).map(p=>(
+            <button key={p} onClick={()=>toggleCard(p)}
+              style={{ background:selectedCards.includes(p)?"rgba(249,115,22,0.08)":"none", cursor:"pointer", border:`1px solid ${selectedCards.includes(p)?"#f97316":"#2a2d3a"}`, borderRadius:6, padding:"7px 12px", fontFamily:"inherit", fontSize:12, color:selectedCards.includes(p)?"#f97316":"#8b8fa8" }}>
+              {p}
+            </button>
+          ))}
+        </div>
+        <div style={S.chartBox}>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={trendData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e2130"/>
+              <XAxis dataKey="month" tick={{fill:"#555",fontSize:11}} axisLine={false} tickLine={false}/>
+              <YAxis tickFormatter={fmt} tick={{fill:"#555",fontSize:11}} axisLine={false} tickLine={false} width={55}/>
+              <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:12,color:"#8b8fa8",paddingTop:10}}/>
+              {selectedCards.map((p,i)=><Line key={p} type="monotone" dataKey={p} stroke={CHART_COLORS[i]} strokeWidth={2} dot={false} activeDot={{r:5}}/>)}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:10, marginTop:14 }}>
+          {selectedCards.map((p,i)=>{ const h=PRICE_HISTORY[p]; if(!h) return null; const first=h[0].price,last=h[h.length-1].price,ch=((last-first)/first*100).toFixed(1); return(
+            <div key={p} style={{ ...S.statBox, borderColor:`${CHART_COLORS[i]}40` }}>
+              <p style={{ fontSize:11, color:CHART_COLORS[i], letterSpacing:1 }}>{p.toUpperCase()}</p>
+              <p style={{ fontSize:20, fontFamily:"serif", fontWeight:900, marginTop:4 }}>{fmt(last)}</p>
+              <p style={{ fontSize:12, marginTop:2, color:ch>=0?"#22c55e":"#ef4444" }}>{ch>=0?"▲":"▼"} {Math.abs(ch)}% YTD</p>
+            </div>
+          );})}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div style={{ borderTop:"1px solid #1e2130", marginBottom:32 }}/>
+
+      {/* Population & Grade section */}
+      <div>
+        <h2 style={{ fontFamily:"serif", fontWeight:900, fontSize:20, letterSpacing:2, marginBottom:4 }}>POPULATION & GRADE DATA</h2>
+        <p style={{ fontSize:12, color:"#555", marginBottom:16 }}>PSA 10 population vs average sale price</p>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:16 }}>
+          {[["PSA 10 POPULATION","pop","#3b82f6",false],["AVG SALE PRICE (PSA 10)","avgSale","#f97316",true]].map(([title,key,color,isFmt])=>(
+            <div key={title} style={S.chartBox}>
+              <p style={{ fontSize:11, color:"#555", letterSpacing:2, paddingLeft:10, marginBottom:12 }}>{title}</p>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={popData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2130" horizontal={false}/>
+                  <XAxis type="number" tickFormatter={isFmt?fmt:undefined} tick={{fill:"#555",fontSize:10}} axisLine={false} tickLine={false}/>
+                  <YAxis type="category" dataKey="name" tick={{fill:"#8b8fa8",fontSize:10}} width={130} axisLine={false} tickLine={false}/>
+                  <Tooltip content={<Tip/>}/>
+                  <Bar dataKey={key} name={title} fill={color} radius={[0,4,4,0]}/>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ))}
+        </div>
+        <div style={{ background:"#0f1117", border:"1px solid #1e2130", borderRadius:12, overflow:"hidden" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+            <thead><tr style={{ borderBottom:"1px solid #1e2130" }}>
+              {["Player","Sport","Year","Set","Grade","PSA Pop","Avg Sale"].map(h=><th key={h} style={{ padding:"11px 16px", color:"#555", fontSize:11, textAlign:"left", fontWeight:400, letterSpacing:1 }}>{h}</th>)}
+            </tr></thead>
+            <tbody>{filteredCards.map((c,i)=>(
+              <tr key={c.id} style={{ background:i%2!==0?"#0b0d14":"transparent", borderBottom:"1px solid #1a1d28" }}>
+                <td style={{ padding:"10px 16px", color:"#e2e4ef" }}>{c.player}</td>
+                <td style={{ padding:"10px 16px" }}><span style={{ color:SPORT_COLORS[c.sport], fontSize:11 }}>{c.sport}</span></td>
+                <td style={{ padding:"10px 16px", color:"#8b8fa8" }}>{c.year}</td>
+                <td style={{ padding:"10px 16px", color:"#8b8fa8" }}>{c.set}</td>
+                <td style={{ padding:"10px 16px", color:"#22c55e" }}>{c.grade}</td>
+                <td style={{ padding:"10px 16px", color:"#3b82f6" }}>{c.pop.toLocaleString()}</td>
+                <td style={{ padding:"10px 16px", color:"#f97316", fontWeight:500 }}>{fmt(c.avgSale)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
 // ── Search Tab ────────────────────────────────────────────────────────────────
 function SearchTab() {
   const [query, setQuery] = useState("");
