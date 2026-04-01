@@ -422,6 +422,53 @@ function createServer() {
       return;
     }
 
+    // ── Debug endpoint — /api/debug?q=test+query ────────────────────────────
+    if (req.url.startsWith("/api/debug")) {
+      const urlObj = new URL(req.url, "http://localhost");
+      const query = urlObj.searchParams.get("q") || "Mahomes Prizm rookie PSA 10";
+      const encodedKeywords = encodeURIComponent(query);
+      const url = `https://svcs.ebay.com/services/search/FindingService/v1` +
+        `?OPERATION-NAME=findCompletedItems` +
+        `&SERVICE-VERSION=1.0.0` +
+        `&SECURITY-APPNAME=${EBAY_APP_ID}` +
+        `&RESPONSE-DATA-FORMAT=JSON` +
+        `&keywords=${encodedKeywords}` +
+        `&itemFilter(0).name=SoldItemsOnly&itemFilter(0).value=true` +
+        `&sortOrder=EndTimeSoonest` +
+        `&paginationInput.entriesPerPage=5`;
+
+      https.get(url, (ebayRes) => {
+        let data = "";
+        ebayRes.on("data", chunk => data += chunk);
+        ebayRes.on("end", () => {
+          try {
+            const json = JSON.parse(data);
+            const ack = json?.findCompletedItemsResponse?.[0]?.ack?.[0];
+            const totalEntries = json?.findCompletedItemsResponse?.[0]?.paginationOutput?.[0]?.totalEntries?.[0];
+            const items = json?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || [];
+            const errorMsg = json?.findCompletedItemsResponse?.[0]?.errorMessage?.[0]?.error?.[0]?.message?.[0];
+            res.writeHead(200);
+            res.end(JSON.stringify({
+              query,
+              ack,
+              totalEntries,
+              errorMsg: errorMsg || null,
+              sampleTitles: items.slice(0, 5).map(i => ({
+                title: i.title?.[0],
+                price: i.sellingStatus?.[0]?.currentPrice?.[0]?.["__value__"],
+                state: i.sellingStatus?.[0]?.sellingState?.[0],
+              })),
+              rawSnippet: JSON.stringify(json).slice(0, 800),
+            }));
+          } catch(e) {
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: e.message, raw: data.slice(0, 500) }));
+          }
+        });
+      }).on("error", e => { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); });
+      return;
+    }
+
     // ── POST /api/request — user submits a player to track ──────────────────
     if (req.url === "/api/request" && req.method === "POST") {
       let body = "";
