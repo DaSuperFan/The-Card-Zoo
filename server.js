@@ -396,9 +396,18 @@ function createServer() {
     }
 
     if (req.url === "/api/fetch" && req.method === "POST") {
-      // Trigger a manual fetch
+      console.log("Manual fetch triggered via /api/fetch");
       fetchAllPrices()
-        .then(() => { res.writeHead(200); res.end(JSON.stringify({ ok: true })); })
+        .then(() => { res.writeHead(200); res.end(JSON.stringify({ ok: true, message: "Fetch complete" })); })
+        .catch(e => { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); });
+      return;
+    }
+
+    // Also allow GET /api/fetch for easy browser triggering
+    if (req.url === "/api/fetch" && req.method === "GET") {
+      console.log("Manual fetch triggered via browser GET /api/fetch");
+      fetchAllPrices()
+        .then(() => { res.writeHead(200); res.end(JSON.stringify({ ok: true, message: "Fetch complete — check /api/prices for results" })); })
         .catch(e => { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); });
       return;
     }
@@ -578,19 +587,59 @@ function createServer() {
 async function start() {
   createServer();
 
-  // Initial fetch on startup
-  if (EBAY_APP_ID) {
-    await fetchAllPrices().catch(e => console.error("Initial fetch failed:", e.message));
-  } else {
+  if (!EBAY_APP_ID) {
     console.log("Skipping fetch — no EBAY_APP_ID configured");
+    return;
   }
 
-  // Schedule daily refresh
-  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-  setInterval(async () => {
-    console.log("Running scheduled daily fetch...");
-    await fetchAllPrices().catch(e => console.error("Scheduled fetch failed:", e.message));
-  }, TWENTY_FOUR_HOURS);
+  // FETCH_ENABLED env var controls whether auto-fetching is on
+  // Set to "false" in Railway variables to pause all fetching (saves rate limit)
+  // Set to "true" to re-enable
+  const fetchEnabled = process.env.FETCH_ENABLED !== "false";
+
+  if (!fetchEnabled) {
+    console.log("⏸  Auto-fetch DISABLED (FETCH_ENABLED=false) — server running in read-only mode");
+    console.log("   Use POST /api/fetch to trigger a manual fetch when ready");
+    return;
+  }
+
+  // Only fetch on startup if we haven't already fetched today
+  const today = new Date().toISOString().split("T")[0];
+  let alreadyFetchedToday = false;
+
+  if (fs.existsSync(DATA_FILE)) {
+    try {
+      const existing = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+      const lastFetchDate = existing?.lastUpdated?.split("T")[0];
+      if (lastFetchDate === today) {
+        alreadyFetchedToday = true;
+        console.log(`✅ Already fetched today (${today}) — skipping to preserve rate limit`);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  if (!alreadyFetchedToday) {
+    console.log("Running startup fetch...");
+    await fetchAllPrices().catch(e => console.error("Startup fetch failed:", e.message));
+  }
+
+  // Schedule daily fetch at midnight UTC
+  function msUntilMidnightUTC() {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setUTCHours(24, 0, 0, 0);
+    return midnight.getTime() - now.getTime();
+  }
+
+  const msToMidnight = msUntilMidnightUTC();
+  console.log(`⏰ Next scheduled fetch in ${Math.round(msToMidnight / 3600000)}hrs (midnight UTC)`);
+
+  setTimeout(async () => {
+    await fetchAllPrices().catch(e => console.error("Midnight fetch failed:", e.message));
+    setInterval(async () => {
+      await fetchAllPrices().catch(e => console.error("Daily fetch failed:", e.message));
+    }, 24 * 60 * 60 * 1000);
+  }, msToMidnight);
 }
 
 start();
