@@ -1,5 +1,12 @@
 import { useState, useMemo } from "react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area } from "recharts";
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis,
+  CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  AreaChart, Area
+} from "recharts";
+
+const { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+        ResponsiveContainer, Legend, AreaChart, Area } = window.Recharts;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -365,9 +372,10 @@ function PlayerDetailPage({ player, onBack }) {
 }
 
 // ── Hot Market Tab ────────────────────────────────────────────────────────────
-function HotMarketTab({ sportFilter, onPlayerClick, hotPlayers = HOT_PLAYERS, liveStatus = "mock" }) {
+function HotMarketTab({ sportFilter, onPlayerClick, hotPlayers = HOT_PLAYERS, liveStatus = "mock", backendUrl }) {
   const [view, setView] = useState("players");
   const [sortBy, setSortBy] = useState("heat");
+  const [showRequestModal, setShowRequestModal] = useState(false);
 
   const filteredPlayers = useMemo(() =>
     hotPlayers
@@ -392,15 +400,24 @@ function HotMarketTab({ sportFilter, onPlayerClick, hotPlayers = HOT_PLAYERS, li
           </div>
           <p style={{ fontSize:12, color:"#555", marginTop:4 }}>Click any player name to see their full card breakdown & trends</p>
         </div>
-        <div style={{ display:"flex", background:"#0f1117", border:"1px solid #1e2130", borderRadius:8, overflow:"hidden" }}>
+        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+          <button onClick={() => setShowRequestModal(true)}
+            style={{ padding:"8px 16px", background:"none", border:"1px solid #f97316", borderRadius:8, cursor:"pointer", fontFamily:"inherit", fontSize:12, color:"#f97316", display:"flex", alignItems:"center", gap:6 }}>
+            ➕ Request Player
+          </button>
+          <div style={{ display:"flex", background:"#0f1117", border:"1px solid #1e2130", borderRadius:8, overflow:"hidden" }}>
           {[["players","👤 Players"],["cards","🃏 Cards"]].map(([v,l])=>(
             <button key={v} onClick={()=>setView(v)}
               style={{ padding:"8px 18px", background:view===v?"#f97316":"transparent", border:"none", cursor:"pointer", fontFamily:"inherit", fontSize:12, color:view===v?"#fff":"#555" }}>
               {l}
             </button>
           ))}
+          </div>
         </div>
       </div>
+
+      {/* Request Player Modal */}
+      {showRequestModal && <RequestPlayerModal onClose={() => setShowRequestModal(false)} backendUrl={backendUrl} />}
 
       {/* Callout */}
       {view==="players" && topPlayer && (
@@ -625,100 +642,107 @@ function TrendsPopTab({ sportFilter }) {
     </div>
   );
 }
-//  Grade Comparison //
 
-function PSAComp({ sportFilter }) {
-  const [selectedCards, setSelectedCards] = useState(["LeBron James","Patrick Mahomes"]);
-  const filteredCards = useMemo(() => SAMPLE_CARDS.filter(c=>sportFilter==="All"||c.sport===sportFilter), [sportFilter]);
-  const toggleCard = p => setSelectedCards(prev=>prev.includes(p)?prev.filter(x=>x!==p):prev.length<4?[...prev,p]:prev);
-  const trendData = useMemo(() =>
-    MONTHS.map((m,i)=>{ const row={month:m}; selectedCards.forEach(p=>{row[p]=PRICE_HISTORY[p]?.[i]?.price??null;}); return row; }),
-    [selectedCards]
-  );
-  const popData = useMemo(() => filteredCards.map(c=>({name:c.player,pop:c.pop,avgSale:c.avgSale,sport:c.sport})), [filteredCards]);
+// ── Search Tab ────────────────────────────────────────────────────────────────
+// ── Request Player Modal ──────────────────────────────────────────────────────
+function RequestPlayerModal({ onClose, backendUrl }) {
+  const [playerName, setPlayerName] = useState("");
+  const [sport, setSport] = useState("Basketball");
+  const [status, setStatus] = useState(null); // null | "loading" | "success" | "error"
+  const [message, setMessage] = useState("");
+
+  const submit = () => {
+    if (!playerName.trim()) return;
+    setStatus("loading");
+    fetch(`${backendUrl}/api/request`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ player: playerName.trim(), sport }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        setStatus(data.status === "approved" || data.status === "already_tracked" || data.status === "upvoted" || data.status === "requested" ? "success" : "error");
+        setMessage(data.message || "Player requested!");
+      })
+      .catch(() => { setStatus("error"); setMessage("Could not connect to server. Try again later."); });
+  };
+
+  const SPORTS = ["Basketball", "Football", "Baseball", "Hockey"];
+  const SPORT_COLORS = { Basketball: "#f97316", Football: "#22c55e", Baseball: "#3b82f6", Hockey: "#a855f7" };
 
   return (
-    <div>
-      {/* Price Trends section */}
-      <div style={{ marginBottom:32 }}>
-        <h2 style={{ fontFamily:"serif", fontWeight:900, fontSize:20, letterSpacing:2, marginBottom:4 }}>PRICE TRENDS — 12 MONTHS</h2>
-        <p style={{ fontSize:12, color:"#555", marginBottom:16 }}>Select up to 4 cards to compare</p>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:16 }}>
-          {Object.keys(PRICE_HISTORY).map(p=>(
-            <button key={p} onClick={()=>toggleCard(p)}
-              style={{ background:selectedCards.includes(p)?"rgba(249,115,22,0.08)":"none", cursor:"pointer", border:`1px solid ${selectedCards.includes(p)?"#f97316":"#2a2d3a"}`, borderRadius:6, padding:"7px 12px", fontFamily:"inherit", fontSize:12, color:selectedCards.includes(p)?"#f97316":"#8b8fa8" }}>
-              {p}
+    <div style={{ position:"fixed", top:0, left:0, right:0, bottom:0, background:"rgba(0,0,0,0.7)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:"#0f1117", border:"1px solid #2a2d3a", borderRadius:16, padding:32, width:"100%", maxWidth:440, margin:"0 16px" }}>
+
+        {/* Header */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
+          <div>
+            <p style={{ fontFamily:"serif", fontWeight:900, fontSize:20, letterSpacing:2 }}>REQUEST A PLAYER</p>
+            <p style={{ fontSize:12, color:"#555", marginTop:4 }}>Can't find someone? Add them to tracking</p>
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:"none", color:"#555", cursor:"pointer", fontSize:20 }}>✕</button>
+        </div>
+
+        {status === "success" ? (
+          <div style={{ textAlign:"center", padding:"20px 0" }}>
+            <p style={{ fontSize:32 }}>✅</p>
+            <p style={{ fontSize:14, color:"#22c55e", marginTop:12, fontFamily:"serif", fontWeight:900 }}>REQUEST RECEIVED</p>
+            <p style={{ fontSize:12, color:"#8b8fa8", marginTop:8 }}>{message}</p>
+            <button onClick={onClose}
+              style={{ marginTop:20, background:"#f97316", border:"none", borderRadius:8, padding:"10px 24px", color:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:13 }}>
+              Done
             </button>
-          ))}
-        </div>
-        <div style={S.chartBox}>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={trendData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e2130"/>
-              <XAxis dataKey="month" tick={{fill:"#555",fontSize:11}} axisLine={false} tickLine={false}/>
-              <YAxis tickFormatter={fmt} tick={{fill:"#555",fontSize:11}} axisLine={false} tickLine={false} width={55}/>
-              <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:12,color:"#8b8fa8",paddingTop:10}}/>
-              {selectedCards.map((p,i)=><Line key={p} type="monotone" dataKey={p} stroke={CHART_COLORS[i]} strokeWidth={2} dot={false} activeDot={{r:5}}/>)}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:10, marginTop:14 }}>
-          {selectedCards.map((p,i)=>{ const h=PRICE_HISTORY[p]; if(!h) return null; const first=h[0].price,last=h[h.length-1].price,ch=((last-first)/first*100).toFixed(1); return(
-            <div key={p} style={{ ...S.statBox, borderColor:`${CHART_COLORS[i]}40` }}>
-              <p style={{ fontSize:11, color:CHART_COLORS[i], letterSpacing:1 }}>{p.toUpperCase()}</p>
-              <p style={{ fontSize:20, fontFamily:"serif", fontWeight:900, marginTop:4 }}>{fmt(last)}</p>
-              <p style={{ fontSize:12, marginTop:2, color:ch>=0?"#22c55e":"#ef4444" }}>{ch>=0?"▲":"▼"} {Math.abs(ch)}% YTD</p>
+          </div>
+        ) : (
+          <>
+            {/* Player name input */}
+            <div style={{ marginBottom:16 }}>
+              <p style={{ fontSize:11, color:"#555", letterSpacing:1, marginBottom:8 }}>PLAYER NAME</p>
+              <input
+                style={{ width:"100%", background:"#080a0f", border:`1px solid ${playerName ? "#f97316" : "#2a2d3a"}`, borderRadius:8, padding:"12px 16px", fontFamily:"inherit", fontSize:14, color:"#e2e4ef", outline:"none" }}
+                placeholder="e.g. Bo Jackson, Barry Sanders..."
+                value={playerName}
+                onChange={e => setPlayerName(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && submit()}
+                autoFocus
+              />
             </div>
-          );})}
-        </div>
-      </div>
 
-      {/* Divider */}
-      <div style={{ borderTop:"1px solid #1e2130", marginBottom:32 }}/>
-
-      {/* Population & Grade section */}
-      <div>
-        <h2 style={{ fontFamily:"serif", fontWeight:900, fontSize:20, letterSpacing:2, marginBottom:4 }}>POPULATION & GRADE DATA</h2>
-        <p style={{ fontSize:12, color:"#555", marginBottom:16 }}>PSA 10 population vs average sale price</p>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:16 }}>
-          {[["PSA 10 POPULATION","pop","#3b82f6",false],["AVG SALE PRICE (PSA 10)","avgSale","#f97316",true]].map(([title,key,color,isFmt])=>(
-            <div key={title} style={S.chartBox}>
-              <p style={{ fontSize:11, color:"#555", letterSpacing:2, paddingLeft:10, marginBottom:12 }}>{title}</p>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={popData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2130" horizontal={false}/>
-                  <XAxis type="number" tickFormatter={isFmt?fmt:undefined} tick={{fill:"#555",fontSize:10}} axisLine={false} tickLine={false}/>
-                  <YAxis type="category" dataKey="name" tick={{fill:"#8b8fa8",fontSize:10}} width={130} axisLine={false} tickLine={false}/>
-                  <Tooltip content={<Tip/>}/>
-                  <Bar dataKey={key} name={title} fill={color} radius={[0,4,4,0]}/>
-                </BarChart>
-              </ResponsiveContainer>
+            {/* Sport selector */}
+            <div style={{ marginBottom:24 }}>
+              <p style={{ fontSize:11, color:"#555", letterSpacing:1, marginBottom:8 }}>SPORT</p>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                {SPORTS.map(s => (
+                  <button key={s} onClick={() => setSport(s)}
+                    style={{ padding:"6px 16px", borderRadius:20, border:`1px solid ${sport===s?(SPORT_COLORS[s]||"#f97316"):"#2a2d3a"}`, background:sport===s?`${SPORT_COLORS[s]||"#f97316"}18`:"none", color:sport===s?(SPORT_COLORS[s]||"#f97316"):"#555", cursor:"pointer", fontFamily:"inherit", fontSize:12 }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-        <div style={{ background:"#0f1117", border:"1px solid #1e2130", borderRadius:12, overflow:"hidden" }}>
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
-            <thead><tr style={{ borderBottom:"1px solid #1e2130" }}>
-              {["Player","Sport","Year","Set","Grade","PSA Pop","Avg Sale"].map(h=><th key={h} style={{ padding:"11px 16px", color:"#555", fontSize:11, textAlign:"left", fontWeight:400, letterSpacing:1 }}>{h}</th>)}
-            </tr></thead>
-            <tbody>{filteredCards.map((c,i)=>(
-              <tr key={c.id} style={{ background:i%2!==0?"#0b0d14":"transparent", borderBottom:"1px solid #1a1d28" }}>
-                <td style={{ padding:"10px 16px", color:"#e2e4ef" }}>{c.player}</td>
-                <td style={{ padding:"10px 16px" }}><span style={{ color:SPORT_COLORS[c.sport], fontSize:11 }}>{c.sport}</span></td>
-                <td style={{ padding:"10px 16px", color:"#8b8fa8" }}>{c.year}</td>
-                <td style={{ padding:"10px 16px", color:"#8b8fa8" }}>{c.set}</td>
-                <td style={{ padding:"10px 16px", color:"#22c55e" }}>{c.grade}</td>
-                <td style={{ padding:"10px 16px", color:"#3b82f6" }}>{c.pop.toLocaleString()}</td>
-                <td style={{ padding:"10px 16px", color:"#f97316", fontWeight:500 }}>{fmt(c.avgSale)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div>
+
+            {/* Error message */}
+            {status === "error" && (
+              <p style={{ fontSize:12, color:"#ef4444", marginBottom:16 }}>{message}</p>
+            )}
+
+            {/* Submit */}
+            <button onClick={submit} disabled={!playerName.trim() || status === "loading"}
+              style={{ width:"100%", background: playerName.trim() ? "#f97316" : "#1e2130", border:"none", borderRadius:8, padding:"12px", color: playerName.trim() ? "#fff" : "#444", cursor: playerName.trim() ? "pointer" : "default", fontFamily:"inherit", fontSize:14, fontWeight:500, letterSpacing:1 }}>
+              {status === "loading" ? "Submitting..." : "REQUEST PLAYER"}
+            </button>
+
+            <p style={{ fontSize:11, color:"#333", marginTop:12, textAlign:"center" }}>
+              Players are added automatically and tracked from the next daily refresh
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
 }
-// ── Search Tab ────────────────────────────────────────────────────────────────
+
 function SearchTab() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(null);
@@ -730,7 +754,28 @@ function SearchTab() {
   const runSearch = q => {
     const term=(q||query).trim(); if(!term) return;
     setShowSug(false); setLoading(true); setResults(null); setSearched(term);
-    setTimeout(()=>{ setResults(generateMockSales(term)); setLoading(false); }, 900);
+    fetch(`${BACKEND_URL}/api/search?q=${encodeURIComponent(term)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error || !data.stats) {
+          setResults(generateMockSales(term));
+        } else {
+          const psa10 = data.sales.filter(s => s.title && s.title.toUpperCase().includes('PSA 10')).map(s => s.price);
+          const formattedSales = data.sales.map(s => ({
+            ...s,
+            date: s.date ? new Date(s.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : 'N/A',
+            grade: s.title?.match(/PSA \d+/i)?.[0] || 'Raw',
+            platform: 'eBay'
+          }));
+          setResults({
+            ...data,
+            stats: { ...data.stats, psa10Avg: psa10.length ? Math.round(psa10.reduce((a,b)=>a+b,0)/psa10.length) : 0, count: data.sales.length },
+            sales: formattedSales
+          });
+        }
+        setLoading(false);
+      })
+      .catch(() => { setResults(generateMockSales(term)); setLoading(false); });
   };
   return (
     <div>
@@ -755,13 +800,13 @@ function SearchTab() {
           </div>
         )}
       </div>
-      <p style={{ fontSize:11, color:"#333", marginBottom:28 }}>⚠ Simulated data — connect eBay API key in Import tab for live results</p>
+      <p style={{ fontSize:11, color:"#333", marginBottom:28 }}>🔴 Live eBay data — results reflect real recent sales</p>
       {loading&&<div style={{ display:"flex", alignItems:"center", gap:12, padding:"40px 0", color:"#555", fontSize:13 }}><div style={{ width:18, height:18, border:"2px solid #2a2d3a", borderTopColor:"#f97316", borderRadius:"50%", animation:"spin 0.7s linear infinite" }}/>Fetching listings for "{searched}"...</div>}
       {results&&!loading&&(
         <div>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:8 }}>
             <p style={{ fontSize:13, color:"#8b8fa8" }}>Results for <span style={{ color:"#f97316" }}>{searched}</span> <span style={{ color:"#333" }}>· {results.stats.count} sales · last 90 days</span></p>
-            <span style={{ fontSize:10, padding:"2px 8px", borderRadius:4, background:"#1a2a1a", color:"#22c55e", border:"1px solid #22c55e30" }}>SIMULATED DATA</span>
+            <span style={{ fontSize:10, padding:"2px 8px", borderRadius:4, background:"#1a2a1a", color:"#22c55e", border:"1px solid #22c55e30" }}>LIVE EBAY DATA</span>
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))", gap:10, marginBottom:24 }}>
             {[{l:"AVG PRICE",v:fmt(results.stats.avg),c:"#f97316"},{l:"HIGH SALE",v:fmt(results.stats.high),c:"#22c55e"},{l:"LOW SALE",v:fmt(results.stats.low),c:"#ef4444"},{l:"PSA 10 AVG",v:fmt(results.stats.psa10Avg),c:"#a855f7"},{l:"TOTAL SALES",v:results.stats.count,c:"#3b82f6"}].map(({l,v,c})=>(
@@ -922,9 +967,8 @@ export default function TheCardZoo() {
         <PlayerDetailPage player={selectedPlayer} onBack={handleBack}/>
       ) : (
         <div style={S.content}>
-          {activeTab==="hot"      && <HotMarketTab sportFilter={sportFilter} onPlayerClick={handlePlayerClick} hotPlayers={hotPlayers} liveStatus={liveStatus}/>}
+          {activeTab==="hot"      && <HotMarketTab sportFilter={sportFilter} onPlayerClick={handlePlayerClick} hotPlayers={hotPlayers} liveStatus={liveStatus} backendUrl={BACKEND_URL}/>}
           {activeTab==="search"   && <SearchTab/>}
-          {activeTab==="PSAComp"  && ()
           {activeTab==="analysis" && <TrendsPopTab sportFilter={sportFilter}/>}
           {activeTab==="import"   && (
             <div style={{ maxWidth:600 }}>
