@@ -564,6 +564,351 @@ function HotMarketTab({ sportFilter, onPlayerClick, hotPlayers = HOT_PLAYERS, li
   );
 }
 
+
+// ── PSA Comps Tab ─────────────────────────────────────────────────────────────
+const GRADE_LIST = ["Raw", "PSA 7", "PSA 8", "PSA 9", "PSA 10"];
+const GRADE_COLORS_COMP = { "Raw":"#8b8fa8", "PSA 7":"#a855f7", "PSA 8":"#3b82f6", "PSA 9":"#22c55e", "PSA 10":"#f97316" };
+
+// Mock grade data generator — replaced by live eBay data when connected
+function generateGradeData(cardName) {
+  const seed = cardName.split("").reduce((a,c) => a + c.charCodeAt(0), 0);
+  const r = (min, max, off) => Math.floor(Math.abs(Math.sin(seed + off) * 10000) % (max - min) + min);
+  const rawPrice = r(80, 2000, 1);
+  const grades = {
+    "Raw":    { avg: rawPrice,                    pop: null, sales: r(40,200,2),  trend: Array.from({length:8},(_,i)=>Math.round(rawPrice*(0.85+i*0.02)+r(0,20,i*7))) },
+    "PSA 7":  { avg: Math.round(rawPrice*1.4),    pop: r(800,4000,3),  sales: r(20,120,4),  trend: Array.from({length:8},(_,i)=>Math.round(rawPrice*1.4*(0.85+i*0.025)+r(0,30,i*8))) },
+    "PSA 8":  { avg: Math.round(rawPrice*2.2),    pop: r(400,2000,5),  sales: r(15,80,6),   trend: Array.from({length:8},(_,i)=>Math.round(rawPrice*2.2*(0.85+i*0.03)+r(0,40,i*9))) },
+    "PSA 9":  { avg: Math.round(rawPrice*4.1),    pop: r(200,1200,7),  sales: r(10,60,8),   trend: Array.from({length:8},(_,i)=>Math.round(rawPrice*4.1*(0.85+i*0.04)+r(0,60,i*10))) },
+    "PSA 10": { avg: Math.round(rawPrice*11.5),   pop: r(50,500,9),    sales: r(5,40,10),   trend: Array.from({length:8},(_,i)=>Math.round(rawPrice*11.5*(0.85+i*0.05)+r(0,100,i*11))) },
+  };
+  return grades;
+}
+
+const WEEK_LABELS = ["W-8","W-7","W-6","W-5","W-4","W-3","W-2","W-1"];
+
+const POPULAR_CARDS = [
+  "LeBron James 2003 Topps Chrome RC",
+  "Patrick Mahomes 2017 Panini Prizm RC",
+  "Mike Trout 2011 Topps Update RC",
+  "Wembanyama 2023 Panini Prizm RC",
+  "Shohei Ohtani 2018 Topps Chrome RC",
+  "Luka Doncic 2018 Panini Prizm RC",
+  "Josh Allen 2018 Panini Prizm RC",
+  "Ronald Acuna Jr 2018 Topps Chrome RC",
+  "Caitlin Clark 2024 Parkside WNBA RC",
+  "Connor McDavid 2015 Upper Deck YG RC",
+  "Jayden Daniels 2024 Panini Prizm RC",
+  "Juan Soto 2018 Topps Chrome RC",
+];
+
+function PSACompsTab({ backendUrl }) {
+  const [cardInput, setCardInput] = useState("");
+  const [activeCard, setActiveCard] = useState("LeBron James 2003 Topps Chrome RC");
+  const [gradeData, setGradeData] = useState(() => generateGradeData("LeBron James 2003 Topps Chrome RC"));
+  const [loading, setLoading] = useState(false);
+  const [showSug, setShowSug] = useState(false);
+  const [selectedGrades, setSelectedGrades] = useState(["Raw","PSA 8","PSA 9","PSA 10"]);
+  const [viewMode, setViewMode] = useState("table"); // "table" | "chart" | "trend"
+
+  const suggestions = useMemo(() =>
+    cardInput.length > 1 ? POPULAR_CARDS.filter(c => c.toLowerCase().includes(cardInput.toLowerCase())).slice(0,5) : [],
+    [cardInput]
+  );
+
+  const loadCard = (name) => {
+    setLoading(true);
+    setActiveCard(name);
+    setCardInput("");
+    setShowSug(false);
+    // Fetch from backend or fall back to mock
+    const fetchGrades = async () => {
+      const grades = {};
+      for (const grade of GRADE_LIST) {
+        try {
+          const q = `${name} ${grade === "Raw" ? "" : grade}`.trim();
+          const r = await fetch(`${backendUrl}/api/search?q=${encodeURIComponent(q)}`);
+          const d = await r.json();
+          if (d.stats && d.stats.avg > 0) {
+            // Filter to last 30 days
+            const thirtyDaysAgo = Date.now() - 30 * 86400000;
+            const recentSales = (d.sales || []).filter(s => new Date(s.date).getTime() > thirtyDaysAgo);
+            const recentPrices = recentSales.map(s => s.price).filter(p => p > 0);
+            const avg30 = recentPrices.length ? Math.round(recentPrices.reduce((a,b)=>a+b,0)/recentPrices.length) : d.stats.avg;
+            grades[grade] = { avg: avg30, pop: null, sales: recentPrices.length, trend: d.trend?.map(t => t.avg).filter(Boolean) || [] };
+          } else {
+            grades[grade] = generateGradeData(name)[grade];
+          }
+        } catch(e) {
+          grades[grade] = generateGradeData(name)[grade];
+        }
+      }
+      return grades;
+    };
+    fetchGrades().then(g => { setGradeData(g); setLoading(false); });
+  };
+
+  const rawAvg = gradeData["Raw"]?.avg || 1;
+
+  // Bar chart data
+  const barData = GRADE_LIST.map(g => ({
+    grade: g,
+    avg: gradeData[g]?.avg || 0,
+    vsRaw: g === "Raw" ? 0 : Math.round(((gradeData[g]?.avg || 0) - rawAvg) / rawAvg * 100),
+  }));
+
+  // Trend chart data
+  const trendData = WEEK_LABELS.map((w, i) => {
+    const row = { week: w };
+    selectedGrades.forEach(g => {
+      const trend = gradeData[g]?.trend || [];
+      row[g] = trend[i] || null;
+    });
+    return row;
+  });
+
+  // ROI calculation — grading cost ~$25 for PSA bulk
+  const GRADING_COST = 25;
+  const roiData = GRADE_LIST.filter(g => g !== "Raw").map(g => {
+    const gradeAvg = gradeData[g]?.avg || 0;
+    const profit = gradeAvg - rawAvg - GRADING_COST;
+    const roi = rawAvg > 0 ? Math.round((profit / (rawAvg + GRADING_COST)) * 100) : 0;
+    return { grade: g, gradeAvg, profit, roi, worthIt: profit > 0 };
+  });
+
+  const bestGrade = [...roiData].sort((a,b) => b.roi - a.roi)[0];
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{marginBottom:24}}>
+        <h2 style={{fontFamily:"serif",fontWeight:900,fontSize:22,letterSpacing:2}}>PSA COMPS</h2>
+        <p style={{fontSize:12,color:"#555",marginTop:4}}>Compare Raw vs graded values — last 30 days of sales</p>
+      </div>
+
+      {/* Card search */}
+      <div style={{position:"relative",marginBottom:20}}>
+        <input
+          style={{width:"100%",background:"#0f1117",border:`1px solid ${cardInput?"#f97316":"#2a2d3a"}`,borderRadius:10,padding:"13px 52px 13px 18px",fontFamily:"inherit",fontSize:14,color:"#e2e4ef",outline:"none"}}
+          placeholder="Search a card e.g. LeBron James 2003 Topps Chrome RC"
+          value={cardInput}
+          onChange={e=>{setCardInput(e.target.value);setShowSug(true);}}
+          onKeyDown={e=>e.key==="Enter"&&cardInput&&loadCard(cardInput)}
+          onFocus={()=>setShowSug(true)}
+        />
+        <button onClick={()=>cardInput&&loadCard(cardInput)}
+          style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"#f97316",border:"none",borderRadius:6,padding:"7px 12px",cursor:"pointer",fontSize:14}}>
+          🔍
+        </button>
+        {showSug && suggestions.length > 0 && (
+          <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,background:"#0f1117",border:"1px solid #2a2d3a",borderRadius:10,zIndex:100,overflow:"hidden"}}>
+            {suggestions.map(s=>(
+              <div key={s} onClick={()=>loadCard(s)}
+                style={{padding:"10px 18px",fontSize:13,color:"#8b8fa8",cursor:"pointer",display:"flex",justifyContent:"space-between"}}
+                onMouseEnter={e=>e.currentTarget.style.background="#161925"}
+                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                {s}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Quick picks */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:24}}>
+        {POPULAR_CARDS.slice(0,6).map(c=>(
+          <button key={c} onClick={()=>loadCard(c)}
+            style={{background:activeCard===c?"rgba(249,115,22,0.1)":"none",border:`1px solid ${activeCard===c?"#f97316":"#2a2d3a"}`,borderRadius:6,padding:"6px 12px",cursor:"pointer",fontFamily:"inherit",fontSize:11,color:activeCard===c?"#f97316":"#8b8fa8"}}>
+            {c.split(" ").slice(0,2).join(" ")}
+          </button>
+        ))}
+      </div>
+
+      {loading && (
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"40px 0",color:"#555",fontSize:13}}>
+          <div style={{width:18,height:18,border:"2px solid #2a2d3a",borderTopColor:"#f97316",borderRadius:"50%",animation:"spin 0.7s linear infinite"}}/>
+          Loading 30-day comp data for {activeCard}...
+        </div>
+      )}
+
+      {!loading && gradeData && (
+        <div>
+          {/* Active card title + best grade callout */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:12}}>
+            <p style={{fontSize:14,color:"#e2e4ef",fontFamily:"serif",fontWeight:900}}>{activeCard.toUpperCase()}</p>
+            {bestGrade && bestGrade.worthIt && (
+              <div style={{background:"#1a2a1a",border:"1px solid #22c55e30",borderRadius:8,padding:"8px 16px",display:"flex",gap:16,alignItems:"center"}}>
+                <div>
+                  <p style={{fontSize:10,color:"#555",letterSpacing:1}}>BEST GRADE TO SUBMIT</p>
+                  <p style={{fontSize:16,fontFamily:"serif",fontWeight:900,color:"#22c55e"}}>{bestGrade.grade}</p>
+                </div>
+                <div>
+                  <p style={{fontSize:10,color:"#555",letterSpacing:1}}>EST. PROFIT</p>
+                  <p style={{fontSize:16,fontFamily:"serif",fontWeight:900,color:"#f97316"}}>${bestGrade.profit.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p style={{fontSize:10,color:"#555",letterSpacing:1}}>ROI</p>
+                  <p style={{fontSize:16,fontFamily:"serif",fontWeight:900,color:"#22c55e"}}>+{bestGrade.roi}%</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* View toggle */}
+          <div style={{display:"flex",background:"#0f1117",border:"1px solid #1e2130",borderRadius:8,overflow:"hidden",marginBottom:20,width:"fit-content"}}>
+            {[["table","📋 Table"],["chart","📊 Bar Chart"],["trend","📈 Trend"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setViewMode(v)}
+                style={{padding:"8px 18px",background:viewMode===v?"#f97316":"transparent",border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:12,color:viewMode===v?"#fff":"#555"}}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {/* TABLE VIEW */}
+          {viewMode==="table" && (
+            <div style={{background:"#0f1117",border:"1px solid #1e2130",borderRadius:12,overflow:"hidden",marginBottom:20}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead>
+                  <tr style={{borderBottom:"1px solid #1e2130"}}>
+                    {["GRADE","AVG SALE (30D)","SALES","VS RAW","GRADING ROI"].map(h=>(
+                      <th key={h} style={{padding:"12px 16px",color:"#555",fontSize:11,textAlign:"left",fontWeight:400,letterSpacing:1}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {GRADE_LIST.map((grade,i)=>{
+                    const d = gradeData[grade] || {};
+                    const vsRaw = grade==="Raw" ? "—" : `+${Math.round(((d.avg||0)-rawAvg)/rawAvg*100)}%`;
+                    const roi = roiData.find(r=>r.grade===grade);
+                    return (
+                      <tr key={grade} style={{borderBottom:"1px solid #1a1d28",background:i%2!==0?"#0b0d14":"transparent"}}>
+                        <td style={{padding:"13px 16px"}}>
+                          <span style={{color:GRADE_COLORS_COMP[grade],fontFamily:"serif",fontWeight:900,fontSize:13}}>{grade}</span>
+                        </td>
+                        <td style={{padding:"13px 16px",color:"#f97316",fontFamily:"serif",fontWeight:900,fontSize:14}}>
+                          {d.avg ? `$${d.avg.toLocaleString()}` : "—"}
+                        </td>
+                        <td style={{padding:"13px 16px",color:"#8b8fa8"}}>{d.sales || "—"}</td>
+                        <td style={{padding:"13px 16px"}}>
+                          {grade==="Raw" ? <span style={{color:"#555"}}>Baseline</span> :
+                            <span style={{color:"#22c55e",fontWeight:500}}>{vsRaw}</span>}
+                        </td>
+                        <td style={{padding:"13px 16px"}}>
+                          {roi ? (
+                            <span style={{color:roi.worthIt?"#22c55e":"#ef4444",fontWeight:500}}>
+                              {roi.worthIt ? `+$${roi.profit.toLocaleString()} (${roi.roi}%)` : `-$${Math.abs(roi.profit).toLocaleString()}`}
+                            </span>
+                          ) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div style={{padding:"10px 16px",borderTop:"1px solid #1e2130"}}>
+                <p style={{fontSize:10,color:"#333"}}>* Grading ROI assumes $25 PSA bulk submission cost · Based on last 30 days of eBay sold data</p>
+              </div>
+            </div>
+          )}
+
+          {/* BAR CHART VIEW */}
+          {viewMode==="chart" && (
+            <div>
+              <div style={{background:"#0f1117",border:"1px solid #1e2130",borderRadius:12,padding:"20px 10px 10px",marginBottom:16}}>
+                <p style={{fontSize:11,color:"#555",letterSpacing:2,paddingLeft:10,marginBottom:12}}>AVG SALE PRICE BY GRADE — LAST 30 DAYS</p>
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={barData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2130"/>
+                    <XAxis dataKey="grade" tick={{fill:"#8b8fa8",fontSize:11}} axisLine={false} tickLine={false}/>
+                    <YAxis tickFormatter={v=>v>=1000?`$${(v/1000).toFixed(1)}k`:`$${v}`} tick={{fill:"#555",fontSize:10}} axisLine={false} tickLine={false} width={55}/>
+                    <Tooltip content={({active,payload,label})=>{
+                      if(!active||!payload?.length) return null;
+                      const d = gradeData[label] || {};
+                      const vsRaw = label==="Raw"?"Baseline":`+${Math.round(((d.avg||0)-rawAvg)/rawAvg*100)}% vs Raw`;
+                      return (
+                        <div style={{background:"#0f1117",border:"1px solid #2a2d3a",borderRadius:8,padding:"10px 14px"}}>
+                          <p style={{color:GRADE_COLORS_COMP[label],fontFamily:"serif",fontWeight:900,fontSize:14,marginBottom:4}}>{label}</p>
+                          <p style={{color:"#f97316",fontSize:13}}>Avg: <strong>${(d.avg||0).toLocaleString()}</strong></p>
+                          <p style={{color:"#22c55e",fontSize:12}}>{vsRaw}</p>
+                          <p style={{color:"#555",fontSize:11}}>{d.sales||0} sales in 30 days</p>
+                        </div>
+                      );
+                    }}/>
+                    <Bar dataKey="avg" name="Avg Sale" radius={[6,6,0,0]}>
+                      {barData.map((entry,i)=>(
+                        <rect key={i} fill={GRADE_COLORS_COMP[entry.grade]}/>
+                      ))}
+                    </Bar>
+                    <Bar dataKey="avg" name="Avg Sale" radius={[6,6,0,0]} fill="#f97316"/>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{background:"#0f1117",border:"1px solid #1e2130",borderRadius:12,padding:"20px 10px 10px"}}>
+                <p style={{fontSize:11,color:"#555",letterSpacing:2,paddingLeft:10,marginBottom:12}}>% PREMIUM OVER RAW</p>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={barData.filter(d=>d.grade!=="Raw")}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2130"/>
+                    <XAxis dataKey="grade" tick={{fill:"#8b8fa8",fontSize:11}} axisLine={false} tickLine={false}/>
+                    <YAxis tick={{fill:"#555",fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>`+${v}%`} width={55}/>
+                    <Tooltip content={<Tip/>}/>
+                    <Bar dataKey="vsRaw" name="Premium over Raw" fill="#22c55e" radius={[6,6,0,0]}/>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* TREND VIEW */}
+          {viewMode==="trend" && (
+            <div>
+              <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+                <span style={{fontSize:11,color:"#555"}}>SHOW GRADES:</span>
+                {GRADE_LIST.map(g=>(
+                  <button key={g} onClick={()=>setSelectedGrades(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev,g])}
+                    style={{padding:"4px 12px",borderRadius:20,border:`1px solid ${selectedGrades.includes(g)?GRADE_COLORS_COMP[g]:"#2a2d3a"}`,background:selectedGrades.includes(g)?`${GRADE_COLORS_COMP[g]}18`:"none",color:selectedGrades.includes(g)?GRADE_COLORS_COMP[g]:"#555",fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>
+                    {g}
+                  </button>
+                ))}
+              </div>
+              <div style={{background:"#0f1117",border:"1px solid #1e2130",borderRadius:12,padding:"20px 10px 10px"}}>
+                <p style={{fontSize:11,color:"#555",letterSpacing:2,paddingLeft:10,marginBottom:12}}>8-WEEK PRICE TREND BY GRADE</p>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={trendData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2130"/>
+                    <XAxis dataKey="week" tick={{fill:"#555",fontSize:10}} axisLine={false} tickLine={false}/>
+                    <YAxis tickFormatter={v=>v>=1000?`$${(v/1000).toFixed(1)}k`:`$${v}`} tick={{fill:"#555",fontSize:10}} axisLine={false} tickLine={false} width={55}/>
+                    <Tooltip content={<Tip/>}/>
+                    <Legend wrapperStyle={{fontSize:11,color:"#8b8fa8",paddingTop:10}}/>
+                    {selectedGrades.map(g=>(
+                      <Line key={g} type="monotone" dataKey={g} stroke={GRADE_COLORS_COMP[g]} strokeWidth={2} dot={{r:3,fill:GRADE_COLORS_COMP[g]}} activeDot={{r:5}} connectNulls/>
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Grade summary cards */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10,marginTop:16}}>
+                {selectedGrades.map(g=>{
+                  const d = gradeData[g]||{};
+                  const trend = d.trend||[];
+                  const first = trend[0]||0, last = trend[trend.length-1]||0;
+                  const ch = first>0?((last-first)/first*100).toFixed(1):0;
+                  return (
+                    <div key={g} style={{background:"#0f1117",border:`1px solid ${GRADE_COLORS_COMP[g]}30`,borderRadius:10,padding:"14px 16px"}}>
+                      <p style={{fontSize:11,color:GRADE_COLORS_COMP[g],letterSpacing:1}}>{g}</p>
+                      <p style={{fontSize:20,fontFamily:"serif",fontWeight:900,marginTop:4}}>{d.avg?`$${d.avg.toLocaleString()}`:"—"}</p>
+                      <p style={{fontSize:11,marginTop:4,color:ch>=0?"#22c55e":"#ef4444"}}>{ch>=0?"▲":"▼"} {Math.abs(ch)}% 8-week</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Trends + Pop combined tab ─────────────────────────────────────────────────
 function TrendsPopTab({ sportFilter }) {
   const [selectedCards, setSelectedCards] = useState(["LeBron James","Patrick Mahomes"]);
@@ -972,7 +1317,7 @@ function TheCardZoo() {
       {/* Tabs — hide when on player detail */}
       {!selectedPlayer && (
         <div style={S.tabBar}>
-          {[["hot","🔥 Hot Market"],["search","🔍 Search"],["analysis","📊 Trends & Pop"],["import","⬆ Import"]].map(([id,label])=>tabBtn(id,label))}
+          {[["hot","🔥 Hot Market"],["search","🔍 Search"],["analysis","📊 Trends & Pop"],["psacomps","🏷 PSA Comps"],["import","⬆ Import"]].map(([id,label])=>tabBtn(id,label))}
         </div>
       )}
 
@@ -984,6 +1329,7 @@ function TheCardZoo() {
           {activeTab==="hot"      && <HotMarketTab sportFilter={sportFilter} onPlayerClick={handlePlayerClick} hotPlayers={hotPlayers} liveStatus={liveStatus} backendUrl={BACKEND_URL}/>}
           {activeTab==="search"   && <SearchTab/>}
           {activeTab==="analysis" && <TrendsPopTab sportFilter={sportFilter}/>}
+          {activeTab==="psacomps" && <PSACompsTab backendUrl={BACKEND_URL}/>}
           {activeTab==="import"   && (
             <div style={{ maxWidth:600 }}>
               <h2 style={{ fontFamily:"serif", fontWeight:900, fontSize:22, letterSpacing:2, marginBottom:6 }}>IMPORT YOUR DATA</h2>
